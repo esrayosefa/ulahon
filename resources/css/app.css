@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 font-medium text-white bg-brand hover:bg-brand-600 active:bg-brand-dark transition;
+  }
+  .btn-accent {
+    @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 font-semibold text-white bg-accent hover:opacity-90 transition;
+  }
+  .card {
+    @apply rounded-2xl border border-slate-200/70 bg-white shadow-sm;
+  }
+  .bg-hero {
+    background-image: theme('backgroundImage.brand-gradient');
+  }
+}
