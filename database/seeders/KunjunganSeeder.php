@@ -4,35 +4,23 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use Faker\Factory as Faker;
 
 class KunjunganSeeder extends Seeder
 {
     public function run(): void
     {
-        $data = [
-            [
-                'id_pengguna' => 1, // tamu id 1
-                'timestamp_berkunjung' => Carbon::now()->subDays(2),
-                'moda_kunjungan' => 'langsung',
-                'tujuan_kunjungan' => 'Konsultasi data statistik',
-                'foto' => null,
-                'nomor_antrian' => 'A001',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ],
-            [
-                'id_pengguna' => 2, // tamu id 2
-                'timestamp_berkunjung' => Carbon::now()->subDay(),
-                'moda_kunjungan' => 'online',
-                'tujuan_kunjungan' => 'Permintaan data',
-                'foto' => null,
-                'nomor_antrian' => 'A002',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ],
-        ];
+        $faker = Faker::create('id_ID');
+        $tamuIds = DB::table('tamu')->pluck('id')->toArray();
 
-        DB::table('kunjungan')->insert($data);
+        foreach (range(1, 30) as $i) {
+            DB::table('kunjungan')->insert([
+                'tamu_id' => $faker->randomElement($tamuIds),
+                'tanggal_kunjungan' => $faker->dateTimeBetween('-1 year', 'now'),
+                'keperluan' => $faker->sentence,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 }

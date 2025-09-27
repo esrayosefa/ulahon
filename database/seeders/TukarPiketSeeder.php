@@ -5,27 +5,25 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Faker\Factory as Faker;
 
 class TukarPiketSeeder extends Seeder
 {
     public function run(): void
     {
-        $data = [
-            [
-                'id_piket_awal' => 1,
-                'id_piket_tukar' => 2,
-                'tanggal_awal' => Carbon::now()->subDays(2)->toDateString(),
-                'tanggal_tukar' => Carbon::now()->subDay()->toDateString(),
-                'sesi_awal' => 'sesi 1',
-                'sesi_tukar' => 'sesi 2',
-                'petugas_tukar' => 1,
-                'alasan' => 'Ada rapat mendadak',
-                'status' => 'disetujui',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ],
-        ];
+        $faker = Faker::create('id_ID');
+        $petugasIds = DB::table('users')->pluck('id')->toArray();
 
-        DB::table('tukar_piket')->insert($data);
+        foreach (range(1, 10) as $i) {
+            DB::table('tukar_piket')->insert([
+                'petugas_asal_id' => $faker->randomElement($petugasIds),
+                'petugas_pengganti_id' => $faker->randomElement($petugasIds),
+                'tanggal' => $faker->dateTimeBetween('-2 months', '+1 month'),
+                'alasan' => $faker->sentence,
+                'status' => $faker->randomElement(['pending', 'approved', 'rejected']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 }
