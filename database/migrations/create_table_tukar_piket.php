@@ -34,8 +34,8 @@ return new class extends Migration
             $table->timestamps();
 
             // foreign keys
-            $table->foreign('id_piket_awal')->references('id_piket')->on('piket_petugas')->onDelete('cascade');
-            $table->foreign('id_piket_tukar')->references('id_piket')->on('piket_petugas')->onDelete('cascade');
+            $table->foreign('id_piket_awal')->references('id_piket')->on('piket')->onDelete('cascade');
+            $table->foreign('id_piket_tukar')->references('id_piket')->on('piket')->onDelete('cascade');
             $table->foreign('petugas_tukar')->references('id')->on('users')->onDelete('cascade');
         });
     }

@@ -12,7 +12,7 @@ export const useAuthStore = defineStore("auth", {
         async login(form) {
             this.error = null;
             try {
-                await axios.get("/sanctum/csrf-cookie"); // penting untuk auth sanctum
+                await axios.get("/sanctum/csrf-cookie");
                 const res = await axios.post("/login", form);
                 this.user = res.data.user;
                 return true;

@@ -10,24 +10,20 @@ class PetugasController extends Controller
 {
     public function index()
     {
-        $today = Carbon::today()->toDateString();
+        $today = now()->toDateString();
 
-        $data = PiketPetugas::with('user')
-            ->where('tanggal', $today)
+        $piket = PiketPetugas::with('user')
+            ->whereDate('tanggal', $today)
             ->get()
-            ->groupBy('sesi')
-            ->map(function ($group, $sesi) {
-                $jam = $sesi == 1 ? '08.00–12.00' : '13.00–16.00';
-                return $group->map(fn($p) => [
-                    'name' => $p->user->name,
-                    'foto' => $p->user->foto,
-                    'jam' => $jam,
-                ]);
+            ->map(function ($item) {
+                return [
+                    'nama' => $item->user->name,
+                    'jam' => $item->sesi == 1 ? '08.00–12.00' : '13.00–16.00',
+                    'foto' => $item->user->foto ?? 'https://ui-avatars.com/api/?name=' . urlencode($item->user->name),
+                    'sesi' => $item->sesi,
+                ];
             });
 
-        return response()->json([
-            'sesi_1' => $data[1] ?? [],
-            'sesi_2' => $data[2] ?? [],
-        ]);
+        return response()->json($piket);
     }
 }
