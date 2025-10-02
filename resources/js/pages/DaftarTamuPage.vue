@@ -10,7 +10,7 @@ import {
 import axios from "axios";
 
 const props = defineProps({
-    userRole: { type: String, default: "admin" }, // 'viewer' | 'user' | 'admin'
+    userRole: { type: String, default: "admin" },
 });
 
 const canManage = computed(() => ["user", "admin"].includes(props.userRole));
@@ -147,9 +147,7 @@ function goto(p) {
 
 <template>
     <div class="min-h-full">
-        <div
-            class="rounded-3xl bg-gradient-to-br from-sky-50 to-rose-50 p-6 ring-1 ring-slate-100"
-        >
+        <div class="rounded-3xl bg-gradient-to-b from-blue-100 to-orange-100">
             <div
                 class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
             >

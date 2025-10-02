@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api; // ✅ PERBAIKAN: Namespace yang benar
 
+use App\Http\Controllers\Controller; // Pastikan Anda meng-extend base Controller
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Carbon;
 
 class TamuController extends Controller
 {
@@ -13,14 +15,18 @@ class TamuController extends Controller
         $search  = $request->query('search');
         $perPage = (int) $request->query('per_page', 10);
 
+        // Menggunakan withPagination untuk mendapatkan paginator instance
         $q = DB::table('tamu')
             ->when($search, function ($b) use ($search) {
-                $b->where('nama', 'like', "%{$search}%")
-                  ->orWhere('no_hp', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('asal_instansi', 'like', "%{$search}%")
-                  ->orWhere('alamat', 'like', "%{$search}%")
-                  ->orWhere('jenis_kelamin', 'like', "%{$search}%");
+                // Menggunakan where dan orWhere untuk pencarian
+                $b->where(function($query) use ($search) {
+                    $query->where('nama', 'like', "%{$search}%")
+                          ->orWhere('no_hp', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%")
+                          ->orWhere('asal_instansi', 'like', "%{$search}%")
+                          ->orWhere('alamat', 'like', "%{$search}%")
+                          ->orWhere('jenis_kelamin', 'like', "%{$search}%");
+                });
             })
             ->orderBy('nama');
 
@@ -49,6 +55,8 @@ class TamuController extends Controller
 
     public function destroy($id)
     {
+        // PENTING: Perlu diperhatikan integrity constraint. 
+        // Jika tamu memiliki data di tabel lain (kunjungan, layanan), delete ini akan gagal.
         DB::table('tamu')->where('id', $id)->delete();
         return response()->json(['message' => 'Tamu dihapus.']);
     }
@@ -68,7 +76,8 @@ class TamuController extends Controller
             })
             ->orderBy('nama')
             ->get();
-
+            
+        // PENTING: Pastikan Anda memiliki view di 'resources/views/pdf/ListTamuBlade.php'
         $pdf = Pdf::loadView('pdf.ListTamuBlade', [
             'rows' => $rows,
         ])->setPaper('a4', 'portrait');
@@ -97,19 +106,16 @@ class TamuController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-
-            // Header
             fputcsv($out, ['Nama','No. Whatsapp','Email','Asal Instansi','Jenis Kelamin','Waktu Kunjungan','Alamat']);
 
-            // Rows
             foreach ($rows as $r) {
                 fputcsv($out, [
                     (string) $r->nama,
-                    (string) $r->no_hp, // jaga leading zero
+                    (string) $r->no_hp,
                     (string) $r->email,
                     (string) $r->asal_instansi,
                     (string) $r->jenis_kelamin,
-                    $r->waktu_kunjungan ? \Carbon\Carbon::parse($r->waktu_kunjungan)->timezone('Asia/Jakarta')->format('Y-m-d H:i') : '',
+                    $r->waktu_kunjungan ? Carbon::parse($r->waktu_kunjungan)->timezone('Asia/Jakarta')->format('Y-m-d H:i') : '',
                     (string) $r->alamat,
                 ]);
             }
