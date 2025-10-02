@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 
 class LoginController extends Controller
 {
+    // Method untuk LOGIN
     public function __invoke(Request $request)
     {
         $credentials = $request->validate([
@@ -23,5 +24,16 @@ class LoginController extends Controller
         return response()->json([
             'user' => Auth::user()
         ]);
+    }
+
+    // ✅ Method untuk LOGOUT (Perbaikan fitur logout)
+    public function logout(Request $request)
+    {
+        Auth::guard('web')->logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->json(['message' => 'Berhasil logout']);
     }
 }

@@ -22,6 +22,16 @@ export const useAuthStore = defineStore("auth", {
             }
         },
 
+        // ✅ PERBAIKAN: Fungsi untuk memeriksa sesi saat aplikasi dimuat
+        async checkAuthStatus() {
+            try {
+                const res = await axios.get("/api/user");
+                this.user = res.data;
+            } catch (err) {
+                this.user = null;
+            }
+        },
+
         async logout() {
             await axios.post("/logout");
             this.user = null;

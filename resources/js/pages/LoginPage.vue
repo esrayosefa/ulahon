@@ -1,10 +1,9 @@
 <template>
     <div class="min-h-screen flex flex-col sm:flex-row">
-        <!-- Kiri: Form login -->
         <div
             class="flex flex-col justify-center items-center sm:w-1/2 w-full px-8 py-10 bg-gradient-to-b from-blue-100 to-orange-200"
         >
-            <img :src="logoUrl" alt="Logo Ulahon" class="w-24 mb-4" />
+            <img :src="logoPath" alt="Logo Ulahon" class="w-24 mb-4" />
 
             <h2 class="text-lg font-semibold mb-1">Selamat pagi :)</h2>
             <p class="text-sm text-gray-600 mb-6">
@@ -37,10 +36,9 @@
             </p>
         </div>
 
-        <!-- Kanan: Gambar -->
         <div class="hidden sm:block sm:w-1/2">
             <img
-                :src="bgUrl"
+                :src="bgPath"
                 alt="Layanan Statistik Terpadu"
                 class="w-full h-full object-cover rounded-l-[3rem]"
             />
@@ -49,13 +47,13 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 
-// ✅ URL gambar agar Vite tidak error saat build
-const logoUrl = new URL("/images/ulahon-logo.png", import.meta.url).href;
-const bgUrl = new URL("/images/bps-login.png", import.meta.url).href;
+// ✅ Gunakan computed property untuk membuat jalur gambar dinamis
+const logoPath = computed(() => "/images/ulahon-logo.png");
+const bgPath = computed(() => "/images/bps-login.png");
 
 const router = useRouter();
 const auth = useAuthStore();

@@ -62,6 +62,7 @@ import SidebarItem from "./SidebarItem.vue";
 const collapsed = ref(false);
 const toggleMenu = () => {
     collapsed.value = !collapsed.value;
+    console.log("Sidebar collapsed state:", collapsed.value);
 };
 
 provide("sidebarCollapsed", collapsed);

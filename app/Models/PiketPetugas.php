@@ -14,4 +14,5 @@ class PiketPetugas extends Model
     {
         return $this->belongsTo(User::class);
     }
+    
 }

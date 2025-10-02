@@ -12,15 +12,23 @@ class PetugasController extends Controller
     {
         $today = now()->toDateString();
 
-        $piket = PiketPetugas::with('user')
+        $piket = PiketPetugas::with('user') // Pastikan user_id match
             ->whereDate('tanggal', $today)
             ->get()
             ->map(function ($item) {
+                // ✅ Null check untuk mencegah error 500
+                $userName = $item->user->name ?? 'Petugas Tidak Dikenal';
+                $userFoto = $item->user->foto ?? 'https://ui-avatars.com/api/?name=' . urlencode($userName);
+                
+                // Konversi shift string ke sesi integer untuk frontend Vue (sesi 1 atau 2)
+                $sesi = ($item->shift === 'Pagi') ? 1 : 2;
+                $jam = ($item->shift === 'Pagi') ? '08.00–12.00' : '13.00–16.00';
+
                 return [
-                    'nama' => $item->user->name,
-                    'jam' => $item->sesi == 1 ? '08.00–12.00' : '13.00–16.00',
-                    'foto' => $item->user->foto ?? 'https://ui-avatars.com/api/?name=' . urlencode($item->user->name),
-                    'sesi' => $item->sesi,
+                    'nama' => $userName,
+                    'jam' => $jam,
+                    'foto' => $userFoto,
+                    'sesi' => $sesi, // Mengirim sesi integer yang diharapkan Vue
                 ];
             });
 

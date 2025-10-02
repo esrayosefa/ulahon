@@ -2,7 +2,6 @@
     <header
         class="h-16 px-6 flex items-center justify-between border-b bg-white shadow-sm"
     >
-        <!-- Kolom pencarian -->
         <div class="flex items-center space-x-2 w-full max-w-md relative">
             <input
                 v-model="query"
@@ -16,14 +15,14 @@
             ></i>
         </div>
 
-        <!-- Profil pengguna -->
         <div class="relative" @click="toggleDropdown">
             <div class="flex items-center space-x-3 cursor-pointer select-none">
                 <span class="text-sm font-medium text-gray-700">{{
-                    user?.name || "Pengguna"
+                    // ✅ Akses langsung dari store auth.user
+                    auth.user?.name || "Pengguna"
                 }}</span>
                 <img
-                    :src="user?.foto || '/images/default-avatar.png'"
+                    :src="auth.user?.foto || '/images/default-avatar.png'"
                     alt="User Avatar"
                     class="w-10 h-10 rounded-full object-cover border"
                 />
@@ -48,11 +47,11 @@
 import { useAuthStore } from "@/stores/auth";
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import axios from "axios";
+// import axios from "axios"; // Hapus import axios jika hanya digunakan untuk logout
 
 const router = useRouter();
 const auth = useAuthStore();
-const user = auth.user;
+// const user = auth.user; // Hapus baris ini
 const query = ref("");
 const showDropdown = ref(false);
 
@@ -67,8 +66,8 @@ const toggleDropdown = () => {
 
 const logout = async () => {
     try {
-        await axios.post("/logout");
-        auth.setUser(null);
+        // ✅ Panggil aksi logout dari store, yang sudah diatur untuk memanggil API
+        await auth.logout();
         router.push("/login");
     } catch (err) {
         console.error("Logout gagal:", err);

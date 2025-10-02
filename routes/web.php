@@ -7,10 +7,8 @@ use App\Http\Controllers\Auth\LoginController;
 Route::get('/{any}', function () {
     return view('app'); 
 })->where('any', '.*');
-Route::post('/login', LoginController::class);
-Route::post('/logout', function () {
-    Auth::logout();
-    request()->session()->invalidate();
-    request()->session()->regenerateToken();
-    return response()->json(['message' => 'Logged out']);
-});
+// ✅ Perbaiki route login: Panggil secara eksplisit method __invoke
+Route::post('/login', [LoginController::class, '__invoke']);
+
+// ✅ Tambahkan route logout: Panggil method logout
+Route::post('/logout', [LoginController::class, 'logout']);
