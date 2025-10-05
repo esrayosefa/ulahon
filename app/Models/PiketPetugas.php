@@ -6,13 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class PiketPetugas extends Model
 {
-    protected $table = 'piket_petugas';
+    protected $table = 'piket';
+    protected $primaryKey = 'id_piket';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
-    protected $fillable = ['user_id', 'tanggal', 'sesi'];
+    protected $fillable = ['tanggal','sesi','petugas_id','catatan'];
 
-    public function user()
+    public function petugas()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'petugas_id');
     }
-    
 }
+

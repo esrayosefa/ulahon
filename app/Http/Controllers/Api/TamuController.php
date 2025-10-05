@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Api; // ✅ PERBAIKAN: Namespace yang benar
+namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller; // Pastikan Anda meng-extend base Controller
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Carbon;
+use App\Models\Tamu; // Menggunakan Model untuk best practice
 
 class TamuController extends Controller
 {
@@ -15,36 +16,26 @@ class TamuController extends Controller
         $search  = $request->query('search');
         $perPage = (int) $request->query('per_page', 10);
 
-        // Menggunakan withPagination untuk mendapatkan paginator instance
-        $q = DB::table('tamu')
-            ->when($search, function ($b) use ($search) {
-                // Menggunakan where dan orWhere untuk pencarian
-                $b->where(function($query) use ($search) {
-                    $query->where('nama', 'like', "%{$search}%")
-                          ->orWhere('no_hp', 'like', "%{$search}%")
-                          ->orWhere('email', 'like', "%{$search}%")
-                          ->orWhere('asal_instansi', 'like', "%{$search}%")
-                          ->orWhere('alamat', 'like', "%{$search}%")
-                          ->orWhere('jenis_kelamin', 'like', "%{$search}%");
+        // PERBAIKAN: Menggunakan Model Tamu dan memperbaiki logika query pencarian.
+        $query = Tamu::query()
+            ->when($search, function ($q) use ($search) {
+                // Mengelompokkan kondisi WHERE untuk pencarian yang akurat
+                $q->where(function ($b) use ($search) {
+                    $b->where('nama', 'like', "%{$search}%")
+                      ->orWhere('no_hp', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('asal_instansi', 'like', "%{$search}%")
+                      ->orWhere('alamat', 'like', "%{$search}%")
+                      ->orWhere('jenis_kelamin', 'like', "%{$search}%");
                 });
             })
             ->orderBy('nama');
 
-        $p = $q->paginate($perPage)->appends($request->query());
+        $p = $query->paginate($perPage)->appends($request->query());
 
+        // Tidak perlu mapping manual jika nama kolom sudah sesuai.
         return response()->json([
-            'data' => collect($p->items())->map(function ($r) {
-                return [
-                    'id'              => $r->id,
-                    'nama'            => $r->nama,
-                    'no_hp'           => $r->no_hp,
-                    'email'           => $r->email,
-                    'asal_instansi'   => $r->asal_instansi,
-                    'jenis_kelamin'   => $r->jenis_kelamin,
-                    'waktu_kunjungan' => $r->waktu_kunjungan,
-                    'alamat'          => $r->alamat,
-                ];
-            }),
+            'data' => $p->items(),
             'meta' => [
                 'total'        => $p->total(),
                 'per_page'     => $p->perPage(),
@@ -55,28 +46,35 @@ class TamuController extends Controller
 
     public function destroy($id)
     {
-        // PENTING: Perlu diperhatikan integrity constraint. 
+        // PENTING: Perlu diperhatikan integrity constraint.
         // Jika tamu memiliki data di tabel lain (kunjungan, layanan), delete ini akan gagal.
-        DB::table('tamu')->where('id', $id)->delete();
-        return response()->json(['message' => 'Tamu dihapus.']);
+        Tamu::findOrFail($id)->delete();
+        return response()->json(['message' => 'Tamu berhasil dihapus.']);
+    }
+
+    private function getExportData(Request $request)
+    {
+        $search = $request->query('search');
+
+        return Tamu::query()
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($b) use ($search) {
+                    $b->where('nama', 'like', "%{$search}%")
+                      ->orWhere('no_hp', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('asal_instansi', 'like', "%{$search}%")
+                      ->orWhere('alamat', 'like', "%{$search}%")
+                      ->orWhere('jenis_kelamin', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('nama')
+            ->get();
     }
 
     public function exportPdf(Request $request)
     {
-        $search = $request->query('search');
+        $rows = $this->getExportData($request);
 
-        $rows = DB::table('tamu')
-            ->when($search, function ($b) use ($search) {
-                $b->where('nama', 'like', "%{$search}%")
-                  ->orWhere('no_hp', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('asal_instansi', 'like', "%{$search}%")
-                  ->orWhere('alamat', 'like', "%{$search}%")
-                  ->orWhere('jenis_kelamin', 'like', "%{$search}%");
-            })
-            ->orderBy('nama')
-            ->get();
-            
         // PENTING: Pastikan Anda memiliki view di 'resources/views/pdf/ListTamuBlade.php'
         $pdf = Pdf::loadView('pdf.ListTamuBlade', [
             'rows' => $rows,
@@ -88,36 +86,26 @@ class TamuController extends Controller
 
     public function exportCsv(Request $request)
     {
-        $search = $request->query('search');
-
-        $rows = DB::table('tamu')
-            ->when($search, function ($b) use ($search) {
-                $b->where('nama', 'like', "%{$search}%")
-                  ->orWhere('no_hp', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('asal_instansi', 'like', "%{$search}%")
-                  ->orWhere('alamat', 'like', "%{$search}%")
-                  ->orWhere('jenis_kelamin', 'like', "%{$search}%");
-            })
-            ->orderBy('nama')
-            ->get(['nama','no_hp','email','asal_instansi','jenis_kelamin','waktu_kunjungan','alamat']);
+        $rows = $this->getExportData($request)->map(function ($r) {
+            return [
+                'nama' => (string) $r->nama,
+                'no_hp' => (string) $r->no_hp,
+                'email' => (string) $r->email,
+                'asal_instansi' => (string) $r->asal_instansi,
+                'jenis_kelamin' => (string) $r->jenis_kelamin,
+                'waktu_kunjungan' => $r->waktu_kunjungan ? Carbon::parse($r->waktu_kunjungan)->timezone('Asia/Jakarta')->format('Y-m-d H:i') : '',
+                'alamat' => (string) $r->alamat,
+            ];
+        });
 
         $filename = 'daftar_tamu_' . now('Asia/Jakarta')->format('Ymd_His') . '.csv';
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Nama','No. Whatsapp','Email','Asal Instansi','Jenis Kelamin','Waktu Kunjungan','Alamat']);
+            fputcsv($out, ['Nama', 'No. Whatsapp', 'Email', 'Asal Instansi', 'Jenis Kelamin', 'Waktu Kunjungan', 'Alamat']);
 
-            foreach ($rows as $r) {
-                fputcsv($out, [
-                    (string) $r->nama,
-                    (string) $r->no_hp,
-                    (string) $r->email,
-                    (string) $r->asal_instansi,
-                    (string) $r->jenis_kelamin,
-                    $r->waktu_kunjungan ? Carbon::parse($r->waktu_kunjungan)->timezone('Asia/Jakarta')->format('Y-m-d H:i') : '',
-                    (string) $r->alamat,
-                ]);
+            foreach ($rows as $row) {
+                fputcsv($out, $row);
             }
 
             fclose($out);

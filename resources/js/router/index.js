@@ -9,6 +9,7 @@ import DashboardPage from "@/pages/DashboardPage.vue";
 import DaftarTamuPage from "@/pages/DaftarTamuPage.vue";
 
 const routes = [
+    // ===== Protected area =====
     {
         path: "/",
         component: AuthLayout,
@@ -22,16 +23,71 @@ const routes = [
                 component: DashboardPage,
                 meta: { roles: ["viewer", "user", "admin"] },
             },
-
             {
                 path: "daftar-tamu",
                 name: "daftar-tamu",
                 component: DaftarTamuPage,
-                meta: { roles: ["viewer", "user", "admin"] }, // semua role boleh lihat
+                meta: { roles: ["viewer", "user", "admin"] },
+            },
+            {
+                path: "kunjungan", // ⬅️ no leading slash
+                name: "kunjungan",
+                component: () => import("@/pages/KunjunganPage.vue"),
+                meta: {
+                    requiresAuth: true,
+                    roles: ["viewer", "user", "admin"],
+                },
+            },
+            {
+                path: "search", // ⬅️ no leading slash
+                name: "search",
+                component: () => import("@/pages/SearchResultsPage.vue"), // ⬅️ samakan dengan nama file kamu
+                meta: {
+                    requiresAuth: true,
+                    roles: ["viewer", "user", "admin"],
+                },
+            },
+
+            {
+                path: "layanan",
+                name: "layanan",
+                component: () => import("@/pages/PelaporanLayananPage.vue"),
+                meta: {
+                    requiresAuth: true,
+                    roles: ["viewer", "user", "admin"],
+                },
+            },
+
+            {
+                path: "piket",
+                name: "piket",
+                component: () => import("@/pages/JadwalPiketPage.vue"),
+                meta: {
+                    requiresAuth: true,
+                    roles: ["viewer", "user", "admin"],
+                },
+            },
+
+            {
+                path: "laporan",
+                name: "laporaj",
+                component: () => import("@/pages/LaporanPiketPage.vue"),
+                meta: { requiresAuth: true, roles: ["admin", "user"] },
+            },
+
+            {
+                path: "rating",
+                name: "rating",
+                component: () => import("@/pages/RatingPage.vue"),
+                meta: {
+                    requiresAuth: true,
+                    roles: ["admin", "user", "viewer"],
+                },
             },
         ],
     },
 
+    // ===== Public area =====
     {
         path: "/login",
         component: GuestLayout,
@@ -45,7 +101,7 @@ const routes = [
         ],
     },
 
-    // fallback
+    // ===== Fallback =====
     { path: "/:pathMatch(.*)*", redirect: "/" },
 ];
 

@@ -21,6 +21,8 @@ return new class extends Migration {
 
             $table->string('jenis_layanan');
             $table->text('deskripsi')->nullable();
+            $table->text('kebutuhan_data')->nullable();
+            $table->string('foto_bukti_path')->nullable()->after('deskripsi');
 
             $table->timestamps();
         });
