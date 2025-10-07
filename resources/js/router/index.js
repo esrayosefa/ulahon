@@ -78,7 +78,7 @@ const routes = [
             {
                 path: "rating",
                 name: "rating",
-                component: () => import("@/pages/RatingPage.vue"),
+                component: () => import("@/pages/RatingPetugasPage.vue"),
                 meta: {
                     requiresAuth: true,
                     roles: ["admin", "user", "viewer"],

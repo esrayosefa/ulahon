@@ -23,7 +23,7 @@
                     </p>
                 </div>
 
-                <div v-else>
+                <div v-else class="space-y-6">
                     <section class="bg-white rounded-xl shadow p-4">
                         <h2 class="font-bold text-lg text-gray-700 mb-4">
                             Petugas Piket Hari Ini

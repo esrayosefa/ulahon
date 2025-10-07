@@ -1,195 +1,153 @@
 <script setup>
-import {
-    ref,
-    reactive,
-    computed,
-    watch,
-    onMounted,
-    onBeforeUnmount,
-} from "vue";
+import { ref, onMounted, watch } from "vue";
+import { useRouter } from "vue-router";
 import axios from "axios";
 
-const props = defineProps({
-    userRole: { type: String, default: "admin" },
-});
+const router = useRouter();
 
-const canManage = computed(() => ["user", "admin"].includes(props.userRole));
+// ENDPOINT (samakan bila perlu)
+const API_BASE = "/api/tamu";
+const EXPORT_PDF = "/api/tamu/export/pdf";
 
 const q = ref("");
-const page = ref(1);
-const perPage = ref(10);
-const total = ref(0);
+const loading = ref(false);
 const rows = ref([]);
+const meta = ref({ current_page: 1, last_page: 1, total: 0 });
+const perPage = 10;
 
-const ui = reactive({ loading: false, error: "" });
-
-const exportMenuOpen = ref(false);
-const exportMenuRef = ref(null);
-
-function maskWhatsapp(num) {
-    if (!num) return "-";
-    return String(num).replace(
-        /^(\d{2}).+(\d{4})$/,
-        (_, p1, p2) => `${p1}xxxxxxxx${p2}`
-    );
-}
-function formatWaktu(ts) {
-    if (!ts) return "—";
+async function fetchRows(page = 1) {
+    loading.value = true;
     try {
-        const d = new Date(ts);
-        if (Number.isNaN(d.getTime())) return ts;
-        const pad = (n) => String(n).padStart(2, "0");
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
-            d.getDate()
-        )} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    } catch {
-        return ts;
-    }
-}
-
-const paged = computed(() => ({
-    page: page.value,
-    per_page: perPage.value,
-    search: q.value || "",
-}));
-
-const endpoint = "/api/tamu";
-
-axios.defaults.withCredentials = true;
-axios.defaults.xsrfCookieName = "XSRF-TOKEN";
-axios.defaults.xsrfHeaderName = "X-XSRF-TOKEN";
-
-async function fetchRows() {
-    ui.loading = true;
-    ui.error = "";
-    try {
-        const { data } = await axios.get(endpoint, { params: paged.value });
-        rows.value = data?.data ?? [];
-        total.value = data?.meta?.total ?? rows.value.length;
-        page.value = data?.meta?.current_page ?? page.value;
-        perPage.value = data?.meta?.per_page ?? perPage.value;
-    } catch (err) {
-        ui.error = err?.response?.data?.message || "Gagal memuat data tamu.";
+        const res = await axios.get(API_BASE, {
+            params: { page, per_page: perPage, search: q.value },
+        });
+        rows.value =
+            res.data?.data ??
+            res.data?.items ??
+            (Array.isArray(res.data) ? res.data : []);
+        meta.value = {
+            current_page:
+                res.data?.current_page ?? res.data?.meta?.current_page ?? page,
+            last_page: res.data?.last_page ?? res.data?.meta?.last_page ?? 1,
+            total:
+                res.data?.total ?? res.data?.meta?.total ?? rows.value.length,
+        };
+    } catch (e) {
+        console.error("Gagal memuat tamu:", e);
+        rows.value = [];
+        meta.value = { current_page: 1, last_page: 1, total: 0 };
     } finally {
-        ui.loading = false;
+        loading.value = false;
     }
 }
 
-let t = null;
+// debounce search
+let t;
 watch(q, () => {
     clearTimeout(t);
-    t = setTimeout(() => {
-        page.value = 1;
-        fetchRows();
-    }, 350);
+    t = setTimeout(() => fetchRows(1), 400);
 });
-watch([page, perPage], fetchRows);
+onMounted(() => fetchRows(1));
 
-onMounted(() => {
-    fetchRows().catch(() => {});
-    document.addEventListener("click", handleDocClick);
-});
-onBeforeUnmount(() => {
-    document.removeEventListener("click", handleDocClick);
-});
-
-function onAdd() {
-    if (!canManage.value) return;
-    window.location.href = "/tamu/create";
+function gotoPage(p) {
+    const target = Math.max(1, Math.min(p, meta.value.last_page));
+    if (target !== meta.value.current_page) fetchRows(target);
 }
-function onEdit(row) {
-    if (!canManage.value) return;
-    window.location.href = `/tamu/${row.id}/edit`;
-}
-async function onDelete(row) {
-    if (!canManage.value) return;
-    const ok = window.confirm(`Hapus tamu "${row.nama}"?`);
-    if (!ok) return;
-    ui.loading = true;
-    try {
-        await axios.delete(`${endpoint}/${row.id}`);
-        await fetchRows();
-    } catch (e) {
-        ui.error = e?.response?.data?.message || "Gagal menghapus tamu.";
-    } finally {
-        ui.loading = false;
-    }
-}
-
-function toggleExportMenu() {
-    exportMenuOpen.value = !exportMenuOpen.value;
-}
-function onExport(type) {
-    const base = "/api/tamu/export";
-    const url =
-        type === "pdf"
-            ? `${base}/pdf?search=${encodeURIComponent(q.value || "")}`
-            : `${base}/csv?search=${encodeURIComponent(q.value || "")}`;
+function downloadPdf() {
+    const url = `${EXPORT_PDF}?search=${encodeURIComponent(q.value)}`;
     window.open(url, "_blank");
-    exportMenuOpen.value = false;
 }
-function handleDocClick(e) {
-    if (!exportMenuRef.value) return;
-    if (!exportMenuRef.value.contains(e.target)) exportMenuOpen.value = false;
+async function removeRow(id) {
+    if (!confirm("Hapus data tamu ini?")) return;
+    await axios.delete(`${API_BASE}/${id}`);
+    fetchRows(meta.value.current_page);
+}
+function goCreate() {
+    try {
+        router.push({ name: "tamu-create" });
+    } catch {
+        alert("Form tambah tamu belum tersedia.");
+    }
+}
+function goEdit(id) {
+    try {
+        router.push({ name: "tamu-edit", params: { id } });
+    } catch {
+        alert("Form edit tamu belum tersedia.");
+    }
 }
 
-const lastPage = computed(() =>
-    Math.max(1, Math.ceil(total.value / perPage.value))
-);
-function goto(p) {
-    const target = Math.min(Math.max(1, p), lastPage.value);
-    if (target !== page.value) {
-        page.value = target;
-        fetchRows();
-    }
+/* ===== Mapping kolom (tanpa ubah backend) ===== */
+const val = (v, f = "-") => (v === null || v === undefined || v === "" ? f : v);
+function colNama(r) {
+    return val(r.nama ?? r.nama_tamu ?? r.name ?? r.tamu?.nama);
+}
+function colWa(r) {
+    const w =
+        r.no_hp ?? r.nomor_whatsapp ?? r.whatsapp ?? r.no_wa ?? r.tamu?.no_hp;
+    return val(w);
+}
+function colInstansi(r) {
+    // kosong => tampil '-' (supaya tidak semua 'Umum')
+    return r.asal_instansi ?? r.instansi ?? r.tamu?.asal_instansi ?? "";
+}
+function colJenis(r) {
+    return val(r.jenis_kunjungan ?? r.keperluan ?? r.layanan?.jenis_layanan);
+}
+
+/* Badge warna */
+function pillClass(s) {
+    const v = (s || "").toLowerCase();
+    if (v.includes("umum")) return "bg-green-50 text-green-700";
+    if (v.includes("bappenas")) return "bg-violet-50 text-violet-700";
+    if (v.includes("kominfo")) return "bg-indigo-50 text-indigo-700";
+    if (v.includes("kesehat")) return "bg-rose-50 text-rose-700";
+    if (v.includes("pendidik")) return "bg-blue-50 text-blue-700";
+    return "bg-slate-50 text-slate-600";
 }
 </script>
 
 <template>
-    <div class="min-h-full">
-        <div class="rounded-3xl bg-gradient-to-b from-blue-100 to-orange-100">
+    <!-- FULL WIDTH + radial background (tidak pakai container) -->
+    <div
+        class="min-h-full bg-[radial-gradient(120%_120%_at_0%_0%,#FFE2C7_0%,#F7F1EC_45%,#EEF4FF_100%)]"
+    >
+        <!-- Header + actions: persis style Daftar Kunjungan -->
+        <div class="rounded-3xl bg-gradient-to-b from-blue-50 to-orange-50">
             <div
-                class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+                class="flex flex-col gap-4 p-6 lg:flex-row lg:items-center lg:justify-between"
             >
                 <h1 class="text-2xl font-semibold text-slate-800">
                     Daftar Tamu
                 </h1>
 
-                <div class="flex items-center gap-3">
-                    <label class="relative block w-[560px] max-w-[70vw]">
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Search -->
+                    <label class="relative block w-[560px] max-w-[72vw]">
                         <input
                             v-model="q"
                             type="text"
-                            placeholder="Cari nama, instansi, dll"
-                            class="w-full rounded-full border border-slate-200 bg-white/80 px-10 py-3 shadow-sm outline-none ring-1 ring-transparent focus:ring-2 focus:ring-blue-400"
+                            placeholder="Hinted search text"
+                            class="w-full rounded-full border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-slate-700 outline-none ring-1 ring-transparent placeholder:text-slate-400 focus:ring-2 focus:ring-blue-400"
                         />
                         <svg
-                            class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400"
+                            class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
                             viewBox="0 0 24 24"
                             fill="none"
-                            stroke="currentColor"
                         >
-                            <circle
-                                cx="11"
-                                cy="11"
-                                r="7"
+                            <path
+                                d="M21 21l-4.35-4.35M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
+                                stroke="currentColor"
                                 stroke-width="2"
-                            ></circle>
-                            <line
-                                x1="21"
-                                y1="21"
-                                x2="16.65"
-                                y2="16.65"
-                                stroke-width="2"
-                            ></line>
+                                stroke-linecap="round"
+                            />
                         </svg>
                     </label>
 
+                    <!-- Tambah (warna sama dengan Kunjungan) -->
                     <button
-                        :disabled="!canManage"
-                        @click="onAdd"
-                        class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-white shadow-sm disabled:opacity-50"
-                        title="Tambah data tamu"
+                        @click="goCreate"
+                        class="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-800"
                     >
                         <svg
                             class="h-4 w-4"
@@ -197,228 +155,144 @@ function goto(p) {
                             fill="none"
                             stroke="currentColor"
                         >
-                            <line
-                                x1="12"
-                                y1="5"
-                                x2="12"
-                                y2="19"
+                            <path
+                                d="M12 5v14M5 12h14"
                                 stroke-width="2"
-                            />
-                            <line
-                                x1="5"
-                                y1="12"
-                                x2="19"
-                                y2="12"
-                                stroke-width="2"
+                                stroke-linecap="round"
                             />
                         </svg>
                         Tambah
                     </button>
 
-                    <!-- Unduh: PDF / CSV -->
-                    <div class="relative" ref="exportMenuRef">
-                        <button
-                            @click.stop="toggleExportMenu"
-                            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-slate-700 shadow-sm hover:bg-slate-50"
-                            title="Unduh Daftar Tamu"
-                            aria-haspopup="menu"
-                            :aria-expanded="exportMenuOpen"
+                    <!-- Unduh PDF (outline putih abu seperti Kunjungan) -->
+                    <button
+                        @click="downloadPdf"
+                        class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                        <svg
+                            class="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
                         >
-                            <svg
-                                class="h-4 w-4"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-                                />
-                                <polyline points="7 10 12 15 17 10" />
-                                <line x1="12" y1="15" x2="12" y2="3" />
-                            </svg>
-                            Unduh Daftar Tamu
-                            <svg
-                                class="h-4 w-4"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                            >
-                                <path
-                                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.17l3.71-2.94a.75.75 0 11.94 1.16l-4.24 3.36a.75.75 0 01-.94 0L5.25 8.39a.75.75 0 01-.02-1.18z"
-                                />
-                            </svg>
-                        </button>
-
-                        <div
-                            v-show="exportMenuOpen"
-                            class="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
-                            role="menu"
-                        >
-                            <button
-                                @click.stop="onExport('pdf')"
-                                class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                                role="menuitem"
-                            >
-                                Ekspor sebagai PDF
-                            </button>
-                            <button
-                                @click.stop="onExport('csv')"
-                                class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                                role="menuitem"
-                            >
-                                Ekspor sebagai CSV (Excel)
-                            </button>
-                        </div>
-                    </div>
+                            <path
+                                d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                            />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        Unduh Daftar Tamu PDF
+                    </button>
                 </div>
             </div>
 
-            <div class="mt-6 h-px w-full bg-slate-200/70"></div>
-        </div>
+            <!-- Table -->
+            <div class="p-6">
+                <div class="overflow-x-auto rounded-2xl bg-white shadow">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-slate-500">
+                                <th class="px-6 py-3">Nama Tamu</th>
+                                <th class="px-6 py-3">Nomor WhatsApp</th>
+                                <th class="px-6 py-3">Asal Instansi</th>
+                                <th class="px-6 py-3">Jenis Kunjungan</th>
+                                <th class="px-6 py-3"></th>
+                            </tr>
+                        </thead>
 
-        <div
-            class="mt-6 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-100 shadow-sm"
-        >
-            <div v-if="ui.loading" class="w-full">
-                <div class="h-1 w-full overflow-hidden bg-slate-100">
-                    <div
-                        class="h-1 w-1/3 animate-[loading_1.2s_ease-in-out_infinite] bg-blue-400"
-                    ></div>
-                </div>
-            </div>
-
-            <div v-if="ui.error" class="p-6 text-rose-600">{{ ui.error }}</div>
-
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-left">
-                    <thead class="bg-slate-50 text-sm text-slate-600">
-                        <tr class="border-b border-slate-100">
-                            <th class="px-6 py-4 font-medium">Nama</th>
-                            <th class="px-6 py-4 font-medium">No. Whatsapp</th>
-                            <th class="px-6 py-4 font-medium">Email</th>
-                            <th class="px-6 py-4 font-medium">Asal Instansi</th>
-                            <th class="px-6 py-4 font-medium">Jenis Kelamin</th>
-                            <th class="px-6 py-4 font-medium">
-                                Waktu Kunjungan
-                            </th>
-                            <th class="px-6 py-4 text-right font-medium">
-                                Aksi
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 text-sm">
-                        <tr v-if="!ui.loading && rows.length === 0">
-                            <td
-                                colspan="7"
-                                class="px-6 py-10 text-center text-slate-500"
-                            >
-                                Tidak ada data tamu.
-                            </td>
-                        </tr>
-
-                        <tr
-                            v-for="row in rows"
-                            :key="row.id"
-                            class="hover:bg-slate-50/40"
-                        >
-                            <td class="px-6 py-4 text-slate-800">
-                                {{ row.nama }}
-                            </td>
-                            <td class="px-6 py-4 tabular-nums text-slate-700">
-                                {{ maskWhatsapp(row.no_hp) }}
-                            </td>
-                            <td class="px-6 py-4 text-slate-700">
-                                {{ row.email || "—" }}
-                            </td>
-                            <td class="px-6 py-4">
-                                <span
-                                    class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 bg-slate-50 text-slate-700 ring-slate-100"
+                        <tbody>
+                            <!-- Loading -->
+                            <tr v-if="loading">
+                                <td
+                                    colspan="5"
+                                    class="px-6 py-10 text-center text-slate-500"
                                 >
-                                    {{ row.asal_instansi || "—" }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 text-slate-700">
-                                {{ row.jenis_kelamin || "—" }}
-                            </td>
-                            <td class="px-6 py-4 text-slate-700">
-                                {{ formatWaktu(row.waktu_kunjungan) }}
-                            </td>
-                            <td class="px-6 py-4">
-                                <div class="flex justify-end gap-2">
+                                    Memuat data…
+                                </td>
+                            </tr>
+
+                            <!-- Empty -->
+                            <tr v-else-if="rows.length === 0">
+                                <td
+                                    colspan="5"
+                                    class="px-6 py-10 text-center text-slate-500"
+                                >
+                                    Tidak ada data tamu.
+                                </td>
+                            </tr>
+
+                            <!-- Rows -->
+                            <tr
+                                v-else
+                                v-for="r in rows"
+                                :key="r.id"
+                                class="hover:bg-slate-50/40"
+                            >
+                                <td class="px-6 py-4 text-slate-800">
+                                    {{ colNama(r) }}
+                                </td>
+                                <td
+                                    class="px-6 py-4 tabular-nums text-slate-700"
+                                >
+                                    {{ colWa(r) }}
+                                </td>
+                                <td class="px-6 py-4">
+                                    <template v-if="colInstansi(r)">
+                                        <span
+                                            class="rounded-full px-2.5 py-1 text-xs font-medium"
+                                            :class="pillClass(colInstansi(r))"
+                                        >
+                                            {{ colInstansi(r) }}
+                                        </span>
+                                    </template>
+                                    <span v-else class="text-slate-400">-</span>
+                                </td>
+                                <td class="px-6 py-4 text-slate-800">
+                                    {{ colJenis(r) }}
+                                </td>
+                                <td class="px-6 py-4 text-right">
                                     <button
-                                        :disabled="!canManage"
-                                        @click="onEdit(row)"
-                                        class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-40"
+                                        @click="goEdit(r.id)"
+                                        class="mr-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200"
                                     >
                                         Edit
                                     </button>
                                     <button
-                                        :disabled="!canManage"
-                                        @click="onDelete(row)"
-                                        class="rounded-lg bg-rose-500 px-3 py-1.5 text-sm text-white shadow-sm hover:bg-rose-600 disabled:opacity-40"
+                                        @click="removeRow(r.id)"
+                                        class="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600"
                                     >
                                         Hapus
                                     </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div
-                class="flex flex-col gap-3 border-t border-slate-100 p-4 md:flex-row md:items-center md:justify-between"
-            >
-                <div class="text-sm text-slate-500">
-                    Menampilkan
-                    <select
-                        v-model.number="perPage"
-                        class="mx-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
-                    >
-                        <option :value="5">5</option>
-                        <option :value="10">10</option>
-                        <option :value="25">25</option>
-                    </select>
-                    dari
-                    <span class="font-medium text-slate-700">{{ total }}</span>
-                    tamu
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
-                <div class="flex items-center gap-2">
-                    <button
-                        @click="goto(page - 1)"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        Sebelumnya
-                    </button>
-                    <span class="text-sm text-slate-600"
-                        >Hal.
-                        <span class="font-medium text-slate-800">{{
-                            page
-                        }}</span>
-                        / {{ lastPage }}</span
-                    >
-                    <button
-                        @click="goto(page + 1)"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        Berikutnya
-                    </button>
+                <!-- Pagination -->
+                <div class="mt-4 flex items-center justify-between text-sm">
+                    <div class="text-slate-600">
+                        Halaman {{ meta.current_page }} dari
+                        {{ meta.last_page }} · Total {{ meta.total }} data
+                    </div>
+                    <div class="flex gap-2">
+                        <button
+                            @click="gotoPage(meta.current_page - 1)"
+                            :disabled="meta.current_page <= 1"
+                            class="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-50"
+                        >
+                            Sebelumnya
+                        </button>
+                        <button
+                            @click="gotoPage(meta.current_page + 1)"
+                            :disabled="meta.current_page >= meta.last_page"
+                            class="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-50"
+                        >
+                            Berikutnya
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </template>
-
-<style scoped>
-@keyframes loading {
-    0% {
-        transform: translateX(-100%);
-    }
-    50% {
-        transform: translateX(50%);
-    }
-    100% {
-        transform: translateX(200%);
-    }
-}
-</style>
